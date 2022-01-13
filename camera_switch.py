@@ -71,18 +71,18 @@ def detectPose():
                 #print(lastDetected)
                 print(results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_SHOULDER].y)
                 if results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_HIP].visibility >0.9 and results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_HIP].visibility  >0.9 and results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_SHOULDER].y <heigthValueCalculating and results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_SHOULDER].y <heigthValueCalculating :
-                    #print('Standing')    
+                    #print('Standing')
                     standing = True
                 else:
                     standing = False
-                    
+
 detector = Thread(target = detectPose)
 
 def calculate_height(yInput):
   global heigthValueCalculating
-  heigthValueCalculating = yInput /frames_combined.shape[0] 
+  heigthValueCalculating = yInput /frames_combined.shape[0]
   print('heigth = ' + str(heigthValueCalculating))
-  
+
 
 def click_and_select(event, x, y, flags, param):
 	# grab references to the global variables
@@ -90,7 +90,7 @@ def click_and_select(event, x, y, flags, param):
 	global genericY
 	if event == cv2.EVENT_LBUTTONUP:
 		refPt.append((x, y))
-		
+
 		genericY = y
 		calculate_height(y)
 		# draw a rectangle around the region of interest
@@ -100,10 +100,33 @@ def click_and_select(event, x, y, flags, param):
 		cv2.line(frames_combined, pt1=(0,genericY), pt2=(4000, genericY), color=(0,0,255), thickness=10)
 		cv2.imshow("frames_combined", frames_combined)
 
-        
+def resize_blackborders(image, output_width, output_height):
+    input_width = image.shape[1]
+    input_height = image.shape[0]
 
+    width_ratio = input_width / output_width
+    height_ratio = input_height / output_height
 
+    temp_image = None
+    if width_ratio > height_ratio:
+        width = output_width
+        height = int(input_height / width_ratio)
+        height_diff = int(height - input_height)
+        _height_diff = int(height_diff / 2)
+        image = cv2.resize(image, (width, height))
+        temp_image = np.zeros((height + height_diff, width, image.shape[2]), np.uint8)
+        temp_image[_height_diff:(height + _height_diff), 0:width] = image
+    else:
+        width = int(input_width / height_ratio)
+        width_diff = int(width - input_width)
+        _width_diff = int(width_diff / 2)
+        height = output_height
+        image = cv2.resize(image, (width, height))
+        temp_image = np.zeros((height, width + width_diff, image.shape[2]), np.uint8)
+        temp_image[0:height, _width_diff:(width + _width_diff)] = image
 
+    output = cv2.resize(temp_image, (output_width, output_height))
+    return output
 
 with pyvirtualcam.Camera(width=output_size_width, height=output_size_height, fps=output_fps) as output:
     print(f'Using output device: {output.device}')
@@ -113,31 +136,31 @@ with pyvirtualcam.Camera(width=output_size_width, height=output_size_height, fps
         # Capture frame-by-frame
         ret_1, frame_1 = input_1.read()
         ret_2, frame_2 = input_2.read()
-        
+
         # Try to detect faces
         grayscale = cv2.cvtColor(frame_1, cv2.COLOR_BGR2GRAY) # Convert into grayscale
         faces = face_cascade.detectMultiScale(grayscale, 1.1, 4) # Apply cascade
         image = cv2.cvtColor(frame_1, cv2.COLOR_BGR2RGB)
         if not detector.is_alive():
             detector.start()
-                
+
         # Set the output frame
-        output_frame = cv2.resize(frame_2, (output_size_width, output_size_height))
+        output_frame = resize_blackborders(frame_2, output_size_width, output_size_height)
         output_camera = 'Camera 2'
         time_now_ms = int(time.time() * 1000.0)
         if standing:
             standingTIme = time_now_ms
         else :
             sittingTIme = time_now_ms
-        
+
         if standingTIme >= (time_now_ms - output_switch_delay):
-            output_frame = cv2.resize(frame_1, (output_size_width, output_size_height))
+            output_frame = resize_blackborders(frame_1, output_size_width, output_size_height)
             output_camera = 'Camera 1'
         if sittingTIme >= (time_now_ms - output_switch_delay):
-            output_frame = cv2.resize(frame_2, (output_size_width, output_size_height))
+            output_frame = resize_blackborders(frame_2, output_size_width, output_size_height)
             output_camera = 'Camera 2'
         if lastDetected < (time_now_ms - 5000):
-            output_frame = cv2.resize(frame_2, (output_size_width, output_size_height))
+            output_frame = resize_blackborders(frame_2, output_size_width, output_size_height)
             output_camera = 'Camera 2'
         # Show camera name
         if (output_camera_name):
@@ -157,7 +180,7 @@ with pyvirtualcam.Camera(width=output_size_width, height=output_size_height, fps
             if (preview_draw_rectangles):
                 for (x, y, w, h) in faces:
                     cv2.rectangle(frame_1, (x, y), (x+w, y+h), preview_rectangle_color, 2)
-            
+
             # Show camera names
             if (preview_camera_names):
                 frame_1 = cv2.putText(frame_1, "Camera 1", (50, 50), camera_name_font_family, camera_name_font_scale, camera_name_font_color, 1, cv2.LINE_AA)
@@ -177,7 +200,7 @@ with pyvirtualcam.Camera(width=output_size_width, height=output_size_height, fps
             else:
                 frame_1 = cv2.copyMakeBorder(frame_1, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=(0, 0, 0))
                 frame_2 = cv2.copyMakeBorder(frame_2, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=(0, 0, 0))
-            
+
             # Combine
             frames_combined = cv2.hconcat([frame_1, frame_2])
 
@@ -187,9 +210,9 @@ with pyvirtualcam.Camera(width=output_size_width, height=output_size_height, fps
             cv2.imshow('frames_combined', frames_combined)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            
+
         # Wait for next frame
-       
+
         output.sleep_until_next_frame()
 
 # When everything is done, close related windows
