@@ -4,7 +4,7 @@ import time
 import mediapipe as mp
 from threading import Lock, Thread
 import PySimpleGUI as sg
-
+import numpy as np
 
 # Webcam switcher based on face-detection
 # By group 3 - Robin Witmer, Alexandru Malgras and Jelle Schroijen
